@@ -16,7 +16,19 @@ Data Processing
 
 ```{r, cache=TRUE}
 data <- read.csv(bzfile("./data/repdata-data-StormData.csv.bz2"))
+object.size(data)
 ```
+
+```{r, cache=TRUE}
+data <- data[,c("STATE","COUNTYNAME","EVTYPE","FATALITIES","INJURIES","PROPDMG","PROPDMGEXP","CROPDMG","CROPDMGEXP")]
+object.size(data)
+colnames(data) <- tolower(colnames(data))
+
+```
+
+
+Results
+-------------------------------------------------------
 
 You can also embed plots, for example:
 
