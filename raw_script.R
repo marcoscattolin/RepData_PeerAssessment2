@@ -1,11 +1,12 @@
 library(reshape2)
 library(plyr)
 library(ggplot2)
+library(maps)
 #load data
 bigdata <- read.csv(bzfile("./data/repdata-data-StormData.csv.bz2"))
 
 #select relevant columns
-data <- bigdata[,c("STATE","COUNTYNAME","EVTYPE","FATALITIES","INJURIES","PROPDMG","PROPDMGEXP","CROPDMG","CROPDMGEXP")]
+data <- bigdata[,c("STATE","COUNTYNAME","EVTYPE","FATALITIES","INJURIES","PROPDMG","PROPDMGEXP","CROPDMG","CROPDMGEXP","LATITUDE","LONGITUDE")]
 
 #columns to lower case
 colnames(data) <- tolower(colnames(data))
@@ -14,17 +15,29 @@ colnames(data) <- tolower(colnames(data))
 data$propdmgexp <- toupper(data$propdmgexp)
 data$cropdmgexp <- toupper(data$cropdmgexp)
 
-#verify values
+
+#evttype to upper case
+data$evtype <- factor(toupper(data$evtype))
+
+
+#check exp values
 table(data$cropdmgexp)
 table(data$propdmgexp)
-summary(data$cropdmg)
-summary(data$propdmg)
+
+
+#look for not valid values for cropdmgexp
+validexp <- c("","H","K","M","B")
+invalid.exp <- !(data$cropdmgexp %in% validexp)
+mean(invalid.exp)
+data[invalid.exp,]
+
+#look for not valid for cropdmgexp
+invalid.exp <- !(data$propdmgexp %in% validexp)
+mean(invalid.exp)
+data[invalid.exp,]
 
 
 #define valid multipliers
-validexp <- c("","H","K","M","B")
-exponents$validexp <- validexp
-exponents$propdmgmultiplier <- c(1,10^2,10^3,10^6,10^9)
 exponents <- data.frame(c("","H","K","M","B"),c(1,10^2,10^3,10^6,10^9))
 colnames(exponents) <- c("validexp","multiplier")
 
@@ -41,50 +54,101 @@ colnames(exponents) <- c("validexp","cropdmgmultiplier")
 data <- merge(data, exponents, by.x="cropdmgexp", by.y="validexp")
 data$cropdmg <- (data$cropdmg*data$cropdmgmultiplier)
 
-#medltadata for cost damage plot
-melted <- melt(data, id="evtype",measure.vars=c("propdmg","cropdmg"),value.name="costdamage")
-costdamage <- dcast(melted,evtype~variable,fun.aggregate=sum)
-costdamage <- costdamage[((costdamage$propdmg+costdamage$cropdmg) > 0),]
-costdamage$propdmg <- ifelse(costdamage$propdmg == 0,1,costdamage$propdmg)
-costdamage$cropdmg <- ifelse(costdamage$cropdmg == 0,1,costdamage$cropdmg)
-
-#rank by total cost
-costdamage$totalcost <- costdamage$propdmg+costdamage$cropdmg
-costdamage <- arrange(costdamage,desc(totalcost))
-qplot(data=costdamage,log(propdmg),log(cropdmg))
-head(costdamage,10)
-
-#rank by PCA
-a <- princomp(costdamage[,2:3], scale=TRUE)
-summary(a)
-screeplot(a)
-costdamage$score <- -a$scores[,1]
-costdamage <- arrange(costdamage,desc(score))
-head(costdamage,10)
+#clean latitudes and longitudes
+data$longitude <- -data$longitude/100
+data$latitude <- data$latitude/100
 
 
-#medltadata for cost health plot
-melted <- melt(data, id="evtype",measure.vars=c("fatalities","injuries"),value.name="healthdamage")
-healthdamage <- dcast(melted,evtype~variable,fun.aggregate=sum)
-healthdamage <- healthdamage[((healthdamage$fatalities+healthdamage$injuries) > 0),]
-healthdamage$fatalities <- ifelse(healthdamage$fatalities == 0,1,healthdamage$fatalities)
-healthdamage$injuries <- ifelse(healthdamage$injuries == 0,1,healthdamage$injuries)
-qplot(log(healthdamage$fatalities),log(healthdamage$injuries)) + geom_smooth(method="lm")
+#drop unnecessary columns
+data <- data[,c("state","evtype","fatalities","injuries","propdmg","cropdmg","latitude","longitude")]
 
 
-#rank by PCA
-a <- princomp(healthdamage[,2:3], scale=TRUE)
-summary(a)
-screeplot(a)
-healthdamage$score <- a$scores[,1]
-healthdamage <- arrange(healthdamage,desc(score))
-head(healthdamage,10)
+#Define economicDmgScore using PCA
+pca <- princomp(data[,c("propdmg","cropdmg")], scale=TRUE)
+summary(pca)
+plot(pca,type="lines", main = "Screeplot for Economic damage")
+data$economicDmgScore <- -pca$scores[,1]
+data[head(order(data$economicDmgScore,decreasing=T)),]
+
+
+#Define healthDmgScore using PCA
+pca <- princomp(data[,c("fatalities","injuries")], scale=TRUE)
+summary(pca)
+plot(pca,type="lines", main = "Screeplot for Economic damage")
+data$healthDmgScore <- pca$scores[,1]        
+data[head(order(data$healthDmgScore,decreasing=T)),]
+
+
+#find worstEconomicEvents
+worstEconomicEvents <- data[,c("state","evtype","economicDmgScore")]
+worstEconomicEvents <- tapply(worstEconomicEvents$economicDmgScore,worstEconomicEvents$evtype,sum)
+worstEconomicEvents <- data.frame(head(worstEconomicEvents[order(worstEconomicEvents,decreasing=T)],5))
+economicDisasters <- subset(data, evtype %in% row.names(worstEconomicEvents))
+economicDisasters <- arrange(economicDisasters, desc(economicDmgScore))
+economicDisasters <- subset(economicDisasters,(longitude != 0 & latitude != 0))
+economicDisasters <- head(economicDisasters,100)
+map("usa")
+radius <- economicDisasters$economicDmgScore/(100000000)
+symbols(economicDisasters$longitude,economicDisasters$latitude, circles=radius)
 
 
 
+#find worstHealthEvents
+worstHealthEvents <- data[,c("state","evtype","healthDmgScore")]
+worstHealthEvents <- tapply(worstHealthEvents$healthDmgScore,worstHealthEvents$evtype,sum)
+worstHealthEvents <- data.frame(head(worstHealthEvents[order(worstHealthEvents,decreasing=T)],5))
+healthDisasters <- subset(data, evtype %in% row.names(worstHealthEvents))
+healthDisasters <- arrange(healthDisasters, desc(healthDmgScore))
+healthDisasters <- subset(healthDisasters,longitude != 0 & latitude != 0)
+healthDisasters <- head(healthDisasters,100)
 
 
 
 
 
+#-------------------ECONOMIC
 
+#Get world map info
+map <- map_data("usa")
+
+#Creat a base plot
+p <- ggplot() + coord_fixed()
+
+#Add map to base plot
+base_world <- p + geom_polygon(data=map,
+                               aes(x=long,
+                                   y=lat,
+                                   group=group))
+
+#Creat an example plot
+map_with_jitter <- base_world+geom_point(data=economicDisasters,
+                                         aes(x=economicDisasters$longitude,
+                                             y=economicDisasters$latitude,
+                                             size=log(economicDisasters$economicDmgScore)),
+                                         colour= "red",
+                                         alpha=I(0.5))
+print(map_with_jitter)
+
+
+#-------------------HEALTH
+
+#Get world map info
+map <- map_data("usa")
+
+#Creat a base plot
+p <- ggplot() + coord_fixed()
+
+#Add map to base plot
+base_world <- p + geom_polygon(data=map,
+                               aes(x=long,
+                                   y=lat,
+                                   group=group))
+
+#Creat an example plot
+map_with_jitter <- base_world+geom_point(data=healthDisasters,
+                                         aes(x=healthDisasters$longitude,
+                                             y=healthDisasters$latitude,
+                                             size=healthDisasters$healthDmgScore),
+                                         colour= "red",
+                                         alpha=I(0.5))
+print(map_with_jitter)
