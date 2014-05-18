@@ -23,7 +23,9 @@ calculateCosts <- function(data){
         data$cropdmg <- (data$cropdmg*data$cropdmgmultiplier)
         data
 }
-
+normalize <- function(vect){
+        (vect-min(vect))/(max(vect)-min(vect))
+}
 
 
 #load data
@@ -119,3 +121,13 @@ healthData <- melt(healthData, id="state", id.vars="variable", measure.vars="val
 colnames(healthData) <- c("evtype","totalHealthCost","state")
 healthData$evtype <- factor(healthData$evtype)
 healthData$state <- factor(healthData$state)
+
+
+
+#map values
+norm <- normalize(log(economicData$totalCost))
+pal <- colorRamp(c("white","black"))
+map("state", regions = healthData$state, lty = 1, lwd =1, boundary=TRUE, fill=TRUE, col=gray(norm))
+
+map("state", regions = c("KA","CA"), lty = 1, lwd =1, boundary=TRUE, fill=TRUE, col = c(0,0.5))
+
