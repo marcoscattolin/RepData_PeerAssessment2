@@ -5,35 +5,16 @@ library(maps)
 library(RColorBrewer)
 
 
-calculateCosts <- function(data){
-        #define valid multipliers
-        exponents <- data.frame(c("","0","H","K","M","B"),c(1,1,10^2,10^3,10^6,10^9))
-        colnames(exponents) <- c("validexp","multiplier")
-        
-        #subset over valid exps
-        data <- subset(data, (cropdmgexp %in% exponents$validexp) & (propdmgexp %in% exponents$validexp))
-        
-        
-        #convert damage values in number
-        colnames(exponents) <- c("validexp","propdmgmultiplier")
-        data <- merge(data, exponents, by.x="propdmgexp", by.y="validexp")
-        data$propdmg <- (data$propdmg*data$propdmgmultiplier)
-        
-        colnames(exponents) <- c("validexp","cropdmgmultiplier")
-        data <- merge(data, exponents, by.x="cropdmgexp", by.y="validexp")
-        data$cropdmg <- (data$cropdmg*data$cropdmgmultiplier)
-        data
-}
 normalize <- function(vect){
         (vect-min(vect))/(max(vect)-min(vect))
 }
 
 
 #load data
-bigdata <- read.csv(bzfile("./data/repdata-data-StormData.csv.bz2"))
+data <- read.csv(bzfile("./data/repdata-data-StormData.csv.bz2"))
 
 #select relevant columns
-data <- bigdata[,c("STATE","EVTYPE","FATALITIES","INJURIES","PROPDMG","PROPDMGEXP","CROPDMG","CROPDMGEXP","LATITUDE","LONGITUDE")]
+data <- bigdata[,c("STATE","EVTYPE","FATALITIES","INJURIES","PROPDMG","PROPDMGEXP","CROPDMG","CROPDMGEXP")]
 
 #columns to lower case
 colnames(data) <- tolower(colnames(data))
@@ -59,16 +40,24 @@ data[!(data$propdmgexp %in% c("","0","H","K","M","B")),]
 
 
 
-data <- calculateCosts(data)
+#define valid multipliers
+exponents <- data.frame(c("","0","H","K","M","B"),c(1,1,10^2,10^3,10^6,10^9))
+colnames(exponents) <- c("validexp","multiplier")
+
+#subset over valid exps
+data <- subset(data, (cropdmgexp %in% exponents$validexp) & (propdmgexp %in% exponents$validexp))
 
 
-#clean latitudes and longitudes
-data$longitude <- -data$longitude/100
-data$latitude <- data$latitude/100
+#convert damage values in number
+colnames(exponents) <- c("validexp","propdmgmultiplier")
+data <- merge(data, exponents, by.x="propdmgexp", by.y="validexp")
+data$propdmg <- (data$propdmg*data$propdmgmultiplier)
+
+colnames(exponents) <- c("validexp","cropdmgmultiplier")
+data <- merge(data, exponents, by.x="cropdmgexp", by.y="validexp")
+data$cropdmg <- (data$cropdmg*data$cropdmgmultiplier)
 
 
-#drop unnecessary columns
-data <- data[,c("state","evtype","fatalities","injuries","propdmg","cropdmg","latitude","longitude")]
 
 
 #----------economic section
@@ -123,10 +112,9 @@ colnames(healthData) <- c("evtype","totalHealthCost","state")
 healthData$evtype <- factor(healthData$evtype)
 healthData$state <- factor(healthData$state)
 
-par(mfrow=c(1,1))
-
 #map values for health cost
 tmp <- numeric(0)
+data(state.fips)
 tmp <- data.frame(state.fips$abb,state.fips$polyname)
 colnames(tmp) <- c("state","stateName")
 healthData <- merge(healthData,tmp)
