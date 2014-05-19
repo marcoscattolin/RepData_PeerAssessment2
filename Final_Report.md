@@ -218,14 +218,16 @@ healthData <- melt(healthData, id = "state", id.vars = "variable", measure.vars 
 Results
 -------------------------------------------------------
 
-Results about economic impact
+Economic impact
 ------------------------------
 
-Based on the above calculations, for **events have the greatest economic consequences** we obtain:
+Based on the above calculations, for **events that have the greatest economic consequences** we obtain (costs in Bn$):
 
 ```r
 colnames(economicData) <- c("eventType", "totalCost_Bn", "state")
 economicData <- economicData[, c("state", "eventType", "totalCost_Bn")]
+
+# convert in Bn$
 economicData$totalCost_Bn <- economicData$totalCost_Bn/10^9
 economicData[!is.na(economicData$totalCost_Bn), ]
 ```
@@ -301,7 +303,7 @@ economicData[!is.na(economicData$totalCost_Bn), ]
 ```
 
 
-We can look at how economic costs are bore by each state over a map. Berfore doing that, though, we see that the distribution of total costs is very skewed. In order to have a more readable map, we will consider the **(totalCost_Bn)^(1/3)** to compensate for skewness:
+We can look at how economic costs are bore by each state on a map. Before doing that, though, we see that the distribution of total costs is very skewed. In order to have a more readable map, we will consider the **(totalCost_Bn)^(1/3)** to compensate for skewness:
 
 ```r
 par(mfrow = c(1, 2))
@@ -345,7 +347,7 @@ title(main = "Most harmed states by weather events with economic impact\n (green
 ![plot of chunk unnamed-chunk-16](figure/unnamed-chunk-16.png) 
 
 
-Results about health impact
+Health impact
 -------------------------
 
 For **events with the greatest health consequences** we obtain:
