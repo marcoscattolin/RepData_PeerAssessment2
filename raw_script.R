@@ -2,6 +2,7 @@ library(reshape2)
 library(plyr)
 library(ggplot2)
 library(maps)
+library(RColorBrewer)
 
 
 calculateCosts <- function(data){
@@ -122,12 +123,26 @@ colnames(healthData) <- c("evtype","totalHealthCost","state")
 healthData$evtype <- factor(healthData$evtype)
 healthData$state <- factor(healthData$state)
 
+par(mfrow=c(1,1))
+
+#map values for health cost
+tmp <- numeric(0)
+tmp <- data.frame(state.fips$abb,state.fips$polyname)
+colnames(tmp) <- c("state","stateName")
+healthData <- merge(healthData,tmp)
+healthData$normCost <- normalize(log(healthData$totalHealthCost))
+pal <- colorRamp(c("white","red"))
+map("state", regions = healthData$stateName, lty = 1, lwd =1, boundary=TRUE, fill=TRUE, col=rgb(pal(healthData$normCost)/255))
+title(main="Health Costs suffered by states")
 
 
-#map values
-norm <- normalize(log(economicData$totalCost))
-pal <- colorRamp(c("white","black"))
-map("state", regions = healthData$state, lty = 1, lwd =1, boundary=TRUE, fill=TRUE, col=gray(norm))
-
-map("state", regions = c("KA","CA"), lty = 1, lwd =1, boundary=TRUE, fill=TRUE, col = c(0,0.5))
-
+#map values for economic cost
+tmp <- numeric(0)
+tmp <- data.frame(state.fips$abb,state.fips$polyname)
+colnames(tmp) <- c("state","stateName")
+economicData <- merge(economicData,tmp)
+economicData$normCost <- normalize(log(economicData$totalCost))
+pal <- colorRamp(c("white","green"))
+map("state", regions = economicData$stateName, lty = 1, lwd =1, boundary=TRUE, fill=TRUE, col=rgb(pal(economicData$normCost)/255))
+title(main="Economic Costs suffered by states")
+legend
